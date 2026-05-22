@@ -7,6 +7,7 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <style>
         /* --- Basic Styling --- */
@@ -20,21 +21,89 @@
         .container { max-width: 1100px; margin: 20px auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         .hidden { display: none !important; }
         
-        /* --- Table Styling --- */
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
-        th { background-color: #f2f2f2; }
-        .net-payable { font-weight: bold; color: #d9534f; }
+        /* --- Flex Layout Containers --- */
+        .viewer-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+        .viewer-filters { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .action-buttons { margin: 15px 0; display: flex; gap: 10px; flex-wrap: wrap; }
+        .flex-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+        .flex-row > div { flex: 1; min-width: 150px; }
         
+        /* --- Table Responsive Scroll Wrapper --- */
+        .table-container { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 15px; border: 1px solid #ddd; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background-color: #f2f2f2; color: #333; white-space: nowrap; }
+        .net-payable { font-weight: bold; }
+        
+        /* --- Summary Footer Row --- */
+        .total-row { font-weight: bold; background-color: #e9ecef !important; color: #000; border-top: 2px solid #0056b3; }
+        
+        /* --- Clickable Profile Style --- */
+        .clickable-name { color: #0056b3; text-decoration: underline; cursor: pointer; display: inline-block; }
+        .clickable-name:hover { color: #002e66; }
+
+        /* --- Profile Modal Popup Style --- */
+        .modal { position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; }
+        .modal-content { background-color: #fff; padding: 25px; border-radius: 8px; width: 90%; max-width: 450px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); position: relative; animation: fadeIn 0.25s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .close-modal-btn { position: absolute; top: 10px; right: 15px; color: #aaa; font-size: 24px; font-weight: bold; cursor: pointer; }
+        .close-modal-btn:hover { color: #333; }
+        .profile-details p { margin: 12px 0; font-size: 15px; border-bottom: 1px dashed #eee; padding-bottom: 5px; }
+
+        /* --- Dynamic Conditional Row Colors --- */
+        .row-green { background-color: #e2f0d9 !important; color: #276a1a; }
+        .row-yellow { background-color: #fff2cc !important; color: #7f6000; }
+        .row-orange { background-color: #fce4d6 !important; color: #c65911; }
+        .row-pink { background-color: #f8cecc !important; color: #b85450; }
+        .row-red { background-color: #f1b0b0 !important; color: #990000; font-weight: 500; }
+
+        /* --- Legend Guide --- */
+        .color-legend { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; font-size: 12px; font-weight: 500; }
+        .legend-item { display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd; }
+
         /* --- Forms Styling --- */
         .form-group { margin-bottom: 15px; }
         label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
-        input, select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        input, select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
         .admin-panel { background-color: #eef5ff; border-left: 4px solid #0056b3; padding: 15px; margin-bottom: 20px; }
-        
-        .flex-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
-        .flex-row > div { flex: 1; min-width: 150px; }
         hr { border: 0; border-top: 1px solid #ccc; margin: 20px 0; }
+
+        /* --- CRITICAL FULL-WIDTH OVERRIDE FOR SNAPSHOT EXTRACTION --- */
+        body.exporting .table-container { overflow-x: visible !important; border: none !important; }
+        body.exporting table { min-width: 1000px !important; }
+
+        /* ==========================================
+           MOBILE RESPONSIVE MEDIA QUERIES (<768px)
+           ========================================== */
+        @media (max-width: 768px) {
+            header { flex-direction: column; gap: 12px; text-align: center; padding: 12px; }
+            header h1 { font-size: 18px; }
+            
+            .container { margin: 10px; padding: 12px; border-radius: 6px; }
+            
+            .viewer-header { flex-direction: column; align-items: stretch; gap: 10px; }
+            .viewer-header h2 { margin: 0 0 5px 0; font-size: 18px; text-align: center; }
+            .viewer-filters { flex-direction: column; align-items: stretch; width: 100%; gap: 8px; }
+            .viewer-filters > div { width: 100% !important; }
+            
+            .action-buttons { flex-direction: column; align-items: stretch; gap: 8px; }
+            .action-buttons button { width: 100%; padding: 10px; font-size: 14px; }
+            
+            .flex-row { flex-direction: column; align-items: stretch; gap: 0; }
+            .flex-row > div { width: 100%; margin-bottom: 12px; }
+            
+            .color-legend { justify-content: center; width: 100%; }
+            .legend-item { font-size: 11px; padding: 3px 6px; }
+            
+            #report-container { padding: 10px; }
+            #report-title { font-size: 16px; text-align: center; }
+            
+            table { font-size: 13px; min-width: 800px; } /* Fixed minimum rendering width inside scroll container */
+            th, td { padding: 8px 5px; }
+            
+            .modal-content { padding: 18px; width: 95%; }
+            .profile-details p { font-size: 14px; }
+        }
     </style>
 </head>
 <body>
@@ -137,6 +206,24 @@
                     </select>
                 </div>
                 <div class="form-group">
+                    <label>Student ID (Optional):</label>
+                    <input type="text" id="new-student-id" placeholder="e.g. 202101005">
+                </div>
+            </div>
+            <div class="flex-row" style="margin-top: 10px;">
+                <div class="form-group">
+                    <label>Batch (Optional):</label>
+                    <input type="text" id="new-student-batch" placeholder="e.g. 15th Batch">
+                </div>
+                <div class="form-group">
+                    <label>Department (Optional):</label>
+                    <input type="text" id="new-student-dept" placeholder="e.g. CSE">
+                </div>
+                <div class="form-group">
+                    <label>Mobile No (Optional):</label>
+                    <input type="text" id="new-student-mobile" placeholder="e.g. +8801712...">
+                </div>
+                <div class="form-group">
                     <button id="add-student-btn" style="width: 100%; margin-bottom: 2px; background-color: #28a745;">+ Add Student</button>
                 </div>
             </div>
@@ -144,42 +231,84 @@
         </div>
 
         <div id="viewer-section">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="viewer-header">
                 <h2>Monthly Statements</h2>
-                <div class="form-group" style="margin: 0;">
-                    <label style="display:inline;">Select Month: </label>
-                    <select id="viewer-month-select">
+                <div class="viewer-filters">
+                    <div class="form-group" style="margin: 0; min-width: 180px;">
+                        <input type="text" id="viewer-search-input" placeholder="🔍 Search by name...">
+                    </div>
+                    <div class="form-group" style="margin: 0; min-width: 120px;">
+                        <select id="viewer-wing-select">
+                            <option value="">All Wings</option>
+                            <option value="Wing 1">Wing 1</option>
+                            <option value="Wing 2">Wing 2</option>
                         </select>
+                    </div>
+                    <div class="form-group" style="margin: 0; min-width: 120px;">
+                        <select id="viewer-month-select">
+                            </select>
+                    </div>
                 </div>
             </div>
 
-            <div style="margin: 10px 0 20px 0; display: flex; gap: 10px;">
+            <div class="action-buttons">
                 <button id="download-pdf-btn" style="background-color: #dc3545;">📄 Download PDF Report</button>
                 <button id="download-jpeg-btn" style="background-color: #17a2b8;">🖼️ Download JPEG Image</button>
+                <button id="download-excel-btn" style="background-color: #28a745;">📊 Download Excel Report</button>
             </div>
             
             <div id="report-container" style="background: white; padding: 15px; border: 1px solid #eee; border-radius: 6px;">
                 <h3 id="report-title" style="margin-top: 0; color: #0056b3; font-size: 18px;">Hall Dining Accounts Statement</h3>
-                <p style="font-size: 15px; margin-bottom: 20px;">
-                    <strong>Cost Per Meal (Rate) for Month: </strong> 
-                    <span id="display-meal-rate" style="color: #0056b3; font-weight: bold;">0.00</span>
-                </p>
+                
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+                    <p style="font-size: 15px; margin: 0;">
+                        <strong>Cost Per Meal: </strong> 
+                        <span id="display-meal-rate" style="color: #0056b3; font-weight: bold;">0.00</span>
+                    </p>
+                    
+                    <div class="color-legend">
+                        <div class="legend-item row-green">Upto 500</div>
+                        <div class="legend-item row-yellow">501 - 1000</div>
+                        <div class="legend-item row-orange">1001 - 2000</div>
+                        <div class="legend-item row-pink">2001 - 3000</div>
+                        <div class="legend-item row-red">Above 3000</div>
+                    </div>
+                </div>
 
-                <table id="accounts-table">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Past Payable</th>
-                            <th>Paid</th>
-                            <th>Due (Past - Paid)</th>
-                            <th>Meal Count</th>
-                            <th>Total Meal Cost</th>
-                            <th>Net Payable</th>
-                        </tr>
-                    </thead>
-                    <tbody id="accounts-table-body">
-                        </tbody>
-                </table>
+                <div class="table-container">
+                    <table id="accounts-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Past Payable</th>
+                                <th>Paid</th>
+                                <th>Due (Past - Paid)</th>
+                                <th>Meal Count</th>
+                                <th>Total Meal Cost</th>
+                                <th>Net Payable</th>
+                            </tr>
+                        </thead>
+                        <tbody id="accounts-table-body">
+                            </tbody>
+                        <tfoot id="accounts-table-foot">
+                            </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="profile-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-modal-btn">&times;</span>
+            <h3 style="margin-top:0; color:#0056b3; border-bottom: 2px solid #0056b3; padding-bottom:10px;">Student Profile Card</h3>
+            <div class="profile-details">
+                <p><strong>Full Name:</strong> <span id="profile-name"></span></p>
+                <p><strong>Wing Assignment:</strong> <span id="profile-wing"></span></p>
+                <p><strong>Student ID:</strong> <span id="profile-id"></span></p>
+                <p><strong>Batch:</strong> <span id="profile-batch"></span></p>
+                <p><strong>Department:</strong> <span id="profile-dept"></span></p>
+                <p><strong>Mobile Number:</strong> <span id="profile-mobile"></span></p>
             </div>
         </div>
     </div>
@@ -189,9 +318,6 @@
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         import { getDatabase, ref, onValue, update, push, set } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
-        // ==========================================
-        // 1. FIREBASE CONFIGURATION (Using your keys)
-        // ==========================================
         const firebaseConfig = {
             apiKey: "AIzaSyA1PmHoyj8lvXVP3xXsEPJOIRddvc8l434",
             authDomain: "sells-6673f.firebaseapp.com",
@@ -206,7 +332,7 @@
         const auth = getAuth(app);
         const db = getDatabase(app);
 
-        // DOM Elements - UI & Auth
+        // DOM Elements
         const showLoginBtn = document.getElementById('show-login-btn');
         const logoutBtn = document.getElementById('logout-btn');
         const loginSection = document.getElementById('login-section');
@@ -218,10 +344,12 @@
         const cancelLoginBtn = document.getElementById('cancel-login-btn');
 
         const tableBody = document.getElementById('accounts-table-body');
+        const tableFoot = document.getElementById('accounts-table-foot');
         const viewerMonthSelect = document.getElementById('viewer-month-select');
+        const viewerSearchInput = document.getElementById('viewer-search-input');
+        const viewerWingSelect = document.getElementById('viewer-wing-select');
         const displayMealRate = document.getElementById('display-meal-rate');
 
-        // DOM Elements - Admin Tools
         const adminMonth = document.getElementById('admin-month');
         const adminMealRate = document.getElementById('admin-meal-rate');
         const updateRateBtn = document.getElementById('update-rate-btn');
@@ -273,7 +401,7 @@
         });
 
         // ==========================================
-        // 3. DATABASE READ LOGIC (DYNAMIC DATA)
+        // 3. DATABASE READ & CO-FILTER LOGIC
         // ==========================================
         const residentsRef = ref(db, 'residents');
         onValue(residentsRef, (snapshot) => {
@@ -331,7 +459,6 @@
                 adminMealRate.value = parseFloat(currentMonthData.meal_rate || 0).toFixed(2);
                 adminMonth.value = monthKey;
                 
-                // Dynamically sync the report header text for the export document
                 const formattedMonth = monthKey.replace('_', ' ');
                 document.getElementById('report-title').textContent = `Hall Dining Accounts Statement — ${formattedMonth}`;
                 
@@ -341,12 +468,35 @@
 
         function renderTable() {
             tableBody.innerHTML = '';
+            tableFoot.innerHTML = ''; 
+            
             const accounts = currentMonthData.accounts || {};
             const mealRate = parseFloat(currentMonthData.meal_rate || 0);
+            
+            const searchQuery = viewerSearchInput.value.toLowerCase().trim();
+            const selectedWing = viewerWingSelect.value; 
+
+            let matchesCount = 0;
+
+            let totalPastPayable = 0;
+            let totalPaid = 0;
+            let totalDue = 0;
+            let totalNetPayable = 0;
 
             for (let resId in accounts) {
                 const acc = accounts[resId];
-                const resName = residentsData[resId] ? residentsData[resId].name : "Unknown Resident";
+                const studentProfile = residentsData[resId] || {};
+                const resName = studentProfile.name || "Unknown Resident";
+                const resWing = studentProfile.wing || "";
+
+                if (searchQuery && !resName.toLowerCase().includes(searchQuery)) {
+                    continue; 
+                }
+                if (selectedWing && resWing !== selectedWing) {
+                    continue; 
+                }
+
+                matchesCount++;
                 
                 const pastPayable = parseFloat(acc.past_payable || 0);
                 const paid = parseFloat(acc.paid || 0);
@@ -356,9 +506,28 @@
                 const specialCharges = parseFloat(acc.special_charges || 0);
                 const netPayable = due + mealCost + specialCharges;
 
+                totalPastPayable += pastPayable;
+                totalPaid += paid;
+                totalDue += due;
+                totalNetPayable += netPayable;
+
+                let colorClass = '';
+                if (netPayable <= 500) {
+                    colorClass = 'row-green';
+                } else if (netPayable <= 1000) {
+                    colorClass = 'row-yellow';
+                } else if (netPayable <= 2000) {
+                    colorClass = 'row-orange';
+                } else if (netPayable <= 3000) {
+                    colorClass = 'row-pink';
+                } else {
+                    colorClass = 'row-red';
+                }
+
                 const tr = document.createElement('tr');
+                tr.className = colorClass;
                 tr.innerHTML = `
-                    <td>${resName}</td>
+                    <td><span class="clickable-name" data-id="${resId}"><strong>${resName}</strong></span></td>
                     <td>${pastPayable.toFixed(2)}</td>
                     <td>${paid.toFixed(2)}</td>
                     <td>${due.toFixed(2)}</td>
@@ -369,18 +538,63 @@
                 tableBody.appendChild(tr);
             }
 
-            if (Object.keys(accounts).length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="7">No records found for this month.</td></tr>';
+            if (matchesCount === 0) {
+                tableBody.innerHTML = '<tr><td colspan="7" style="color: #666; font-style: italic; padding:20px;">No matching records found.</td></tr>';
+            } else {
+                const trFoot = document.createElement('tr');
+                trFoot.className = 'total-row';
+                trFoot.innerHTML = `
+                    <td>TOTALS</td>
+                    <td>${totalPastPayable.toFixed(2)}</td>
+                    <td>${totalPaid.toFixed(2)}</td>
+                    <td>${totalDue.toFixed(2)}</td>
+                    <td>—</td>
+                    <td>—</td>
+                    <td>${totalNetPayable.toFixed(2)}</td>
+                `;
+                tableFoot.appendChild(trFoot);
             }
         }
 
+        viewerSearchInput.addEventListener('input', renderTable);
+        viewerWingSelect.addEventListener('change', renderTable);
+
         viewerMonthSelect.addEventListener('change', (e) => {
             loadMonthData(e.target.value);
+            viewerSearchInput.value = ""; 
+            viewerWingSelect.value = "";
             adminResidentSelect.value = "";
             adminPastPayable.value = "0";
             adminPaid.value = "0";
             adminMealCount.value = "0";
         });
+
+        // ==========================================
+        // STUDENT PROFILE POPUP MODAL LOGIC
+        // ==========================================
+        const profileModal = document.getElementById('profile-modal');
+        const closeModalBtn = document.querySelector('.close-modal-btn');
+
+        tableBody.addEventListener('click', (e) => {
+            const targetSpan = e.target.closest('.clickable-name');
+            if (targetSpan) {
+                const resId = targetSpan.getAttribute('data-id');
+                const profile = residentsData[resId];
+                if (profile) {
+                    document.getElementById('profile-name').textContent = profile.name || '—';
+                    document.getElementById('profile-wing').textContent = profile.wing || '—';
+                    document.getElementById('profile-id').textContent = profile.student_id || 'Not Provided';
+                    document.getElementById('profile-batch').textContent = profile.batch || 'Not Provided';
+                    document.getElementById('profile-dept').textContent = profile.department || 'Not Provided';
+                    document.getElementById('profile-mobile').textContent = profile.mobile || 'Not Provided';
+                    
+                    profileModal.classList.remove('hidden');
+                }
+            }
+        });
+
+        closeModalBtn.addEventListener('click', () => profileModal.classList.add('hidden'));
+        window.addEventListener('click', (e) => { if (e.target === profileModal) profileModal.classList.add('hidden'); });
 
 
         // ==========================================
@@ -481,6 +695,10 @@
         addStudentBtn.addEventListener('click', () => {
             const name = newStudentName.value.trim();
             const wing = newStudentWing.value;
+            const sId = document.getElementById('new-student-id').value.trim();
+            const batch = document.getElementById('new-student-batch').value.trim();
+            const dept = document.getElementById('new-student-dept').value.trim();
+            const mobile = document.getElementById('new-student-mobile').value.trim();
             const targetMonth = adminMonth.value;
 
             if (!name) return alert("Please enter a student name.");
@@ -489,48 +707,67 @@
             const newResidentRef = push(ref(db, 'residents'));
             const newResId = newResidentRef.key;
 
-            set(newResidentRef, { name: name, wing: wing }).then(() => {
-                const newRecordRef = ref(db, `monthly_records/${targetMonth}/accounts/${newResId}`);
-                return set(newRecordRef, { past_payable: 0, paid: 0, meal_count: 0, special_charges: 0 });
+            set(newResidentRef, { 
+                name: name, 
+                wing: wing,
+                student_id: sId,
+                batch: batch,
+                department: dept,
+                mobile: mobile
             }).then(() => {
-                alert("Student added successfully!");
+                alert("Student profile registered successfully!");
                 newStudentName.value = ''; 
+                document.getElementById('new-student-id').value = '';
+                document.getElementById('new-student-batch').value = '';
+                document.getElementById('new-student-dept').value = '';
+                document.getElementById('new-student-mobile').value = '';
             }).catch((error) => alert("Error adding student: " + error.message));
         });
 
 
         // ==========================================
-        // 5. REPORT DOWNLOAD LOGIC (NEW FEATURE FOR VIEWERS)
+        // 5. REPORT EXPORT CONVERTER SCRIPTS
         // ==========================================
         const downloadPdfBtn = document.getElementById('download-pdf-btn');
         const downloadJpegBtn = document.getElementById('download-jpeg-btn');
+        const downloadExcelBtn = document.getElementById('download-excel-btn');
         const reportContainer = document.getElementById('report-container');
 
-        // PDF Generation
+        // PDF Generation with Responsive Guard overrides
         downloadPdfBtn.addEventListener('click', () => {
             const monthText = viewerMonthSelect.options[viewerMonthSelect.selectedIndex]?.text || "Report";
-            
             const opt = {
                 margin:       0.4,
                 filename:     `Dining_Report_${monthText.replace(' ', '_')}.pdf`,
                 image:        { type: 'jpeg', quality: 0.98 },
                 html2canvas:  { scale: 2, useCORS: true },
-                jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' } // Wide orientation for a perfect table layout
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
             };
-            
-            window.html2pdf().set(opt).from(reportContainer).save();
+            document.body.classList.add('exporting');
+            window.html2pdf().set(opt).from(reportContainer).save().then(() => {
+                document.body.classList.remove('exporting');
+            });
         });
 
-        // JPEG Generation
+        // JPEG Generation with Responsive Guard overrides
         downloadJpegBtn.addEventListener('click', () => {
             const monthText = viewerMonthSelect.options[viewerMonthSelect.selectedIndex]?.text || "Report";
-            
+            document.body.classList.add('exporting');
             window.html2canvas(reportContainer, { scale: 2, useCORS: true }).then(canvas => {
                 let link = document.createElement('a');
                 link.download = `Dining_Report_${monthText.replace(' ', '_')}.jpg`;
                 link.href = canvas.toDataURL('image/jpeg', 0.95);
                 link.click();
+                document.body.classList.remove('exporting');
             });
+        });
+
+        // SheetJS Excel Grid Exporter Function
+        downloadExcelBtn.addEventListener('click', () => {
+            const monthText = viewerMonthSelect.options[viewerMonthSelect.selectedIndex]?.text || "Report";
+            const tableElement = document.getElementById('accounts-table');
+            const workbook = XLSX.utils.table_to_book(tableElement, { sheet: "Dining Ledger" });
+            XLSX.writeFile(workbook, `Dining_Report_${monthText.replace(' ', '_')}.xlsx`);
         });
 
     </script>
