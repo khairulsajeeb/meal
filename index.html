@@ -1,1 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hall Dining Management</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
+    <style>
+        /* --- Basic Styling --- */
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f9f9f9; color: #333; margin: 0; padding: 0; }
+        header { background-color: #0056b3; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+        header h1 { margin: 0; font-size: 20px; }
+        button { cursor: pointer; padding: 8px 15px; border: none; border-radius: 4px; background-color: #0056b3; color: white; font-weight: 500; }
+        button:hover { background-color: #004494; }
+        .header-btn { background-color: #fff; color: #0056b3; font-weight: bold; }
+        
+        .container { max-width: 1100px; margin: 20px auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .hidden { display: none !important; }
+        
+        /* --- Table Styling --- */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background-color: #f2f2f2; }
+        .net-payable { font-weight: bold; color: #d9534f; }
+        
+        /* --- Forms Styling --- */
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
+        input, select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        .admin-panel { background-color: #eef5ff; border-left: 4px solid #0056b3; padding: 15px; margin-bottom: 20px; }
+        
+        .flex-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+        .flex-row > div { flex: 1; min-width: 150px; }
+        hr { border: 0; border-top: 1px solid #ccc; margin: 20px 0; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Hall Dining Accounts</h1>
+        <div>
+            <button id="show-login-btn" class="header-btn">Admin Login</button>
+            <button id="logout-btn" class="header-btn hidden">Logout Admin</button>
+        </div>
+    </header>
+
+    <div class="container">
+        
+        <div id="login-section" class="hidden admin-panel">
+            <h2>Admin Authentication</h2>
+            <div class="form-group">
+                <label>Email:</label>
+                <input type="email" id="login-email" placeholder="admin@hall.com">
+            </div>
+            <div class="form-group">
+                <label>Password:</label>
+                <input type="password" id="login-password" placeholder="********">
+            </div>
+            <button id="login-submit-btn">Login</button>
+            <button id="cancel-login-btn" style="background: #ccc; color: #333;">Cancel</button>
+        </div>
+
+        <div id="admin-controls" class="hidden admin-panel">
+            
+            <h2>Admin Tools: Month Settings</h2>
+            <div class="flex-row" style="background: #fff; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>Active Month:</label>
+                    <input type="text" id="admin-month" readonly style="background-color: #e9ecef;">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>Cost Per Meal (Rate):</label>
+                    <input type="number" id="admin-meal-rate" value="0.00" step="0.01">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <button id="update-rate-btn" style="width: 100%; margin-bottom: 2px;">Save Rate</button>
+                </div>
+            </div>
+
+            <hr>
+
+            <h2>Admin Tools: Update Resident Record</h2>
+            <div class="flex-row">
+                <div class="form-group">
+                    <label>Select Resident:</label>
+                    <select id="admin-resident-select">
+                        <option value="">-- Choose Resident --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Past Payable ($):</label>
+                    <input type="number" id="admin-past-payable" value="0" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Paid Amount ($):</label>
+                    <input type="number" id="admin-paid" value="0" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Meal Count:</label>
+                    <input type="number" id="admin-meal-count" value="0">
+                </div>
+                <div class="form-group">
+                    <button id="update-data-btn" style="width: 100%; margin-bottom: 2px;">Update Record</button>
+                </div>
+            </div>
+
+            <hr>
+
+            <h2>Admin Tools: Roll-Over to New Month</h2>
+            <p style="font-size: 13px; color: #666; margin-top: -10px;">This will automatically carry forward everyone's current Net Payable into the Past Payable of the new month.</p>
+            <div class="flex-row">
+                <div class="form-group">
+                    <label>New Month ID Name:</label>
+                    <input type="text" id="new-month-name" placeholder="e.g., May_2026">
+                </div>
+                <div class="form-group">
+                    <button id="rollover-btn" style="width: 100%; margin-bottom: 2px; background-color: #fd7e14;">⚡ Close Current Month & Roll-Over</button>
+                </div>
+            </div>
+
+            <hr>
+
+            <h2>Admin Tools: Add New Resident</h2>
+            <div class="flex-row">
+                <div class="form-group">
+                    <label>Full Name:</label>
+                    <input type="text" id="new-student-name" placeholder="e.g. John Doe">
+                </div>
+                <div class="form-group">
+                    <label>Wing:</label>
+                    <select id="new-student-wing">
+                        <option value="Wing 1">Wing 1</option>
+                        <option value="Wing 2">Wing 2</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button id="add-student-btn" style="width: 100%; margin-bottom: 2px; background-color: #28a745;">+ Add Student</button>
+                </div>
+            </div>
+
+        </div>
+
+        <div id="viewer-section">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>Monthly Statements</h2>
+                <div class="form-group" style="margin: 0;">
+                    <label style="display:inline;">Select Month: </label>
+                    <select id="viewer-month-select">
+                        </select>
+                </div>
+            </div>
+
+            <div style="margin: 10px 0 20px 0; display: flex; gap: 10px;">
+                <button id="download-pdf-btn" style="background-color: #dc3545;">📄 Download PDF Report</button>
+                <button id="download-jpeg-btn" style="background-color: #17a2b8;">🖼️ Download JPEG Image</button>
+            </div>
+            
+            <div id="report-container" style="background: white; padding: 15px; border: 1px solid #eee; border-radius: 6px;">
+                <h3 id="report-title" style="margin-top: 0; color: #0056b3; font-size: 18px;">Hall Dining Accounts Statement</h3>
+                <p style="font-size: 15px; margin-bottom: 20px;">
+                    <strong>Cost Per Meal (Rate) for Month: </strong> 
+                    <span id="display-meal-rate" style="color: #0056b3; font-weight: bold;">0.00</span>
+                </p>
+
+                <table id="accounts-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Past Payable</th>
+                            <th>Paid</th>
+                            <th>Due (Past - Paid)</th>
+                            <th>Meal Count</th>
+                            <th>Total Meal Cost</th>
+                            <th>Net Payable</th>
+                        </tr>
+                    </thead>
+                    <tbody id="accounts-table-body">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        import { getDatabase, ref, onValue, update, push, set } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+
+        // ==========================================
+        // 1. FIREBASE CONFIGURATION (Using your keys)
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyA1PmHoyj8lvXVP3xXsEPJOIRddvc8l434",
+            authDomain: "sells-6673f.firebaseapp.com",
+            databaseURL: "https://sells-6673f-default-rtdb.firebaseio.com",
+            projectId: "sells-6673f",
+            storageBucket: "sells-6673f.firebasestorage.app",
+            messagingSenderId: "316532466588",
+            appId: "1:316532466588:web:2385d01e311521d42bde59"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getDatabase(app);
+
+        // DOM Elements - UI & Auth
+        const showLoginBtn = document.getElementById('show-login-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const loginSection = document.getElementById('login-section');
+        const adminControls = document.getElementById('admin-controls');
+        
+        const loginEmail = document.getElementById('login-email');
+        const loginPassword = document.getElementById('login-password');
+        const loginSubmitBtn = document.getElementById('login-submit-btn');
+        const cancelLoginBtn = document.getElementById('cancel-login-btn');
+
+        const tableBody = document.getElementById('accounts-table-body');
+        const viewerMonthSelect = document.getElementById('viewer-month-select');
+        const displayMealRate = document.getElementById('display-meal-rate');
+
+        // DOM Elements - Admin Tools
+        const adminMonth = document.getElementById('admin-month');
+        const adminMealRate = document.getElementById('admin-meal-rate');
+        const updateRateBtn = document.getElementById('update-rate-btn');
+
+        const adminResidentSelect = document.getElementById('admin-resident-select');
+        const adminPastPayable = document.getElementById('admin-past-payable');
+        const adminMealCount = document.getElementById('admin-meal-count');
+        const adminPaid = document.getElementById('admin-paid');
+        const updateDataBtn = document.getElementById('update-data-btn');
+
+        const newMonthName = document.getElementById('new-month-name');
+        const rolloverBtn = document.getElementById('rollover-btn');
+
+        const newStudentName = document.getElementById('new-student-name');
+        const newStudentWing = document.getElementById('new-student-wing');
+        const addStudentBtn = document.getElementById('add-student-btn');
+
+        let residentsData = {};
+        let currentMonthData = {};
+
+        // ==========================================
+        // 2. AUTHENTICATION LOGIC
+        // ==========================================
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                showLoginBtn.classList.add('hidden');
+                logoutBtn.classList.remove('hidden');
+                adminControls.classList.remove('hidden');
+                loginSection.classList.add('hidden');
+                adminMonth.value = viewerMonthSelect.value;
+            } else {
+                showLoginBtn.classList.remove('hidden');
+                logoutBtn.classList.add('hidden');
+                adminControls.classList.add('hidden');
+            }
+        });
+
+        showLoginBtn.addEventListener('click', () => { loginSection.classList.remove('hidden'); });
+        cancelLoginBtn.addEventListener('click', () => { loginSection.classList.add('hidden'); });
+
+        loginSubmitBtn.addEventListener('click', () => {
+            signInWithEmailAndPassword(auth, loginEmail.value, loginPassword.value)
+                .then(() => { loginEmail.value = ''; loginPassword.value = ''; })
+                .catch((error) => alert("Login Failed: " + error.message));
+        });
+
+        logoutBtn.addEventListener('click', () => {
+            signOut(auth).then(() => alert("Logged out successfully."));
+        });
+
+        // ==========================================
+        // 3. DATABASE READ LOGIC (DYNAMIC DATA)
+        // ==========================================
+        const residentsRef = ref(db, 'residents');
+        onValue(residentsRef, (snapshot) => {
+            residentsData = snapshot.val() || {};
+            const currentSelection = adminResidentSelect.value; 
+            
+            adminResidentSelect.innerHTML = '<option value="">-- Choose Resident --</option>';
+            for (let id in residentsData) {
+                let opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = residentsData[id].name;
+                adminResidentSelect.appendChild(opt);
+            }
+            adminResidentSelect.value = currentSelection; 
+            renderTable();
+        });
+
+        const monthlyRecordsListRef = ref(db, 'monthly_records');
+        onValue(monthlyRecordsListRef, (snapshot) => {
+            const records = snapshot.val() || {};
+            const keys = Object.keys(records);
+            const preservedSelection = viewerMonthSelect.value;
+
+            viewerMonthSelect.innerHTML = '';
+            
+            if (keys.length === 0) {
+                let opt = document.createElement('option');
+                opt.value = "April_2026";
+                opt.textContent = "April 2026";
+                viewerMonthSelect.appendChild(opt);
+            } else {
+                keys.forEach(key => {
+                    let opt = document.createElement('option');
+                    opt.value = key;
+                    opt.textContent = key.replace('_', ' ');
+                    viewerMonthSelect.appendChild(opt);
+                });
+            }
+
+            if (preservedSelection && records[preservedSelection]) {
+                viewerMonthSelect.value = preservedSelection;
+            } else if (keys.length > 0) {
+                viewerMonthSelect.value = keys[keys.length - 1];
+            }
+
+            loadMonthData(viewerMonthSelect.value);
+        });
+
+        function loadMonthData(monthKey) {
+            if (!monthKey) return;
+            const monthRef = ref(db, `monthly_records/${monthKey}`);
+            onValue(monthRef, (snapshot) => {
+                currentMonthData = snapshot.val() || { meal_rate: 0, accounts: {} };
+                displayMealRate.textContent = parseFloat(currentMonthData.meal_rate || 0).toFixed(2);
+                adminMealRate.value = parseFloat(currentMonthData.meal_rate || 0).toFixed(2);
+                adminMonth.value = monthKey;
+                
+                // Dynamically sync the report header text for the export document
+                const formattedMonth = monthKey.replace('_', ' ');
+                document.getElementById('report-title').textContent = `Hall Dining Accounts Statement — ${formattedMonth}`;
+                
+                renderTable();
+            });
+        }
+
+        function renderTable() {
+            tableBody.innerHTML = '';
+            const accounts = currentMonthData.accounts || {};
+            const mealRate = parseFloat(currentMonthData.meal_rate || 0);
+
+            for (let resId in accounts) {
+                const acc = accounts[resId];
+                const resName = residentsData[resId] ? residentsData[resId].name : "Unknown Resident";
+                
+                const pastPayable = parseFloat(acc.past_payable || 0);
+                const paid = parseFloat(acc.paid || 0);
+                const due = pastPayable - paid;
+                const mealCount = parseInt(acc.meal_count || 0);
+                const mealCost = mealCount * mealRate; 
+                const specialCharges = parseFloat(acc.special_charges || 0);
+                const netPayable = due + mealCost + specialCharges;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${resName}</td>
+                    <td>${pastPayable.toFixed(2)}</td>
+                    <td>${paid.toFixed(2)}</td>
+                    <td>${due.toFixed(2)}</td>
+                    <td>${mealCount}</td>
+                    <td>${mealCost.toFixed(2)}</td>
+                    <td class="net-payable">${netPayable.toFixed(2)}</td>
+                `;
+                tableBody.appendChild(tr);
+            }
+
+            if (Object.keys(accounts).length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="7">No records found for this month.</td></tr>';
+            }
+        }
+
+        viewerMonthSelect.addEventListener('change', (e) => {
+            loadMonthData(e.target.value);
+            adminResidentSelect.value = "";
+            adminPastPayable.value = "0";
+            adminPaid.value = "0";
+            adminMealCount.value = "0";
+        });
+
+
+        // ==========================================
+        // 4. DATABASE WRITE LOGIC (ADMIN VIEW)
+        // ==========================================
+        updateRateBtn.addEventListener('click', () => {
+            const monthStr = adminMonth.value;
+            const newRate = parseFloat(adminMealRate.value);
+            if (!monthStr) return alert("Please specify a month.");
+            
+            const monthRateRef = ref(db, `monthly_records/${monthStr}`);
+            update(monthRateRef, { meal_rate: newRate })
+                .then(() => alert("Cost Per Meal updated! Total calculations refreshed."))
+                .catch((error) => alert("Error updating rate: " + error.message));
+        });
+
+        adminResidentSelect.addEventListener('change', (e) => {
+            const resId = e.target.value;
+            if (!resId) {
+                adminPastPayable.value = "0"; adminPaid.value = "0"; adminMealCount.value = "0";
+                return;
+            }
+            const accData = currentMonthData.accounts && currentMonthData.accounts[resId];
+            if (accData) {
+                adminPastPayable.value = accData.past_payable || "0";
+                adminPaid.value = accData.paid || "0";
+                adminMealCount.value = accData.meal_count || "0";
+            } else {
+                adminPastPayable.value = "0"; adminPaid.value = "0"; adminMealCount.value = "0";
+            }
+        });
+
+        updateDataBtn.addEventListener('click', () => {
+            const resId = adminResidentSelect.value;
+            const monthStr = adminMonth.value;
+            const pastPay = parseFloat(adminPastPayable.value);
+            const amtPaid = parseFloat(adminPaid.value);
+            const mCount = parseInt(adminMealCount.value);
+
+            if (!resId || !monthStr) return alert("Please select a resident and specify a month.");
+
+            const userRecordRef = ref(db, `monthly_records/${monthStr}/accounts/${resId}`);
+            update(userRecordRef, {
+                past_payable: pastPay,
+                paid: amtPaid,
+                meal_count: mCount
+            }).then(() => alert("Resident record updated successfully!"))
+              .catch((error) => alert("Error updating record: " + error.message));
+        });
+
+        rolloverBtn.addEventListener('click', () => {
+            const oldMonthStr = adminMonth.value;
+            const targetMonthStr = newMonthName.value.trim().replace(' ', '_');
+
+            if (!targetMonthStr) return alert("Please enter a name for the new month (e.g., May_2026).");
+            if (oldMonthStr === targetMonthStr) return alert("New month name must be distinct from the current active month.");
+
+            const oldAccounts = currentMonthData.accounts || {};
+            const oldMealRate = parseFloat(currentMonthData.meal_rate || 0);
+            
+            let rolledAccounts = {};
+
+            for (let resId in oldAccounts) {
+                const acc = oldAccounts[resId];
+                const pastPayable = parseFloat(acc.past_payable || 0);
+                const paid = parseFloat(acc.paid || 0);
+                const due = pastPayable - paid;
+                const mealCount = parseInt(acc.meal_count || 0);
+                const mealCost = mealCount * oldMealRate;
+                const specialCharges = parseFloat(acc.special_charges || 0);
+                const netPayable = due + mealCost + specialCharges;
+
+                rolledAccounts[resId] = {
+                    past_payable: parseFloat(netPayable.toFixed(2)), 
+                    paid: 0,
+                    meal_count: 0,
+                    special_charges: 0
+                };
+            }
+
+            for (let resId in residentsData) {
+                if (!rolledAccounts[resId]) {
+                    rolledAccounts[resId] = { past_payable: 0, paid: 0, meal_count: 0, special_charges: 0 };
+                }
+            }
+
+            const newMonthRef = ref(db, `monthly_records/${targetMonthStr}`);
+            set(newMonthRef, {
+                meal_rate: 0, 
+                accounts: rolledAccounts
+            }).then(() => {
+                alert(`Successfully rolled over to ${targetMonthStr.replace('_', ' ')}! Balances transferred.`);
+                newMonthName.value = '';
+                viewerMonthSelect.value = targetMonthStr; 
+            }).catch((error) => alert("Error during month roll-over: " + error.message));
+        });
+
+        addStudentBtn.addEventListener('click', () => {
+            const name = newStudentName.value.trim();
+            const wing = newStudentWing.value;
+            const targetMonth = adminMonth.value;
+
+            if (!name) return alert("Please enter a student name.");
+            if (!targetMonth) return alert("Active tracking month context missing.");
+
+            const newResidentRef = push(ref(db, 'residents'));
+            const newResId = newResidentRef.key;
+
+            set(newResidentRef, { name: name, wing: wing }).then(() => {
+                const newRecordRef = ref(db, `monthly_records/${targetMonth}/accounts/${newResId}`);
+                return set(newRecordRef, { past_payable: 0, paid: 0, meal_count: 0, special_charges: 0 });
+            }).then(() => {
+                alert("Student added successfully!");
+                newStudentName.value = ''; 
+            }).catch((error) => alert("Error adding student: " + error.message));
+        });
+
+
+        // ==========================================
+        // 5. REPORT DOWNLOAD LOGIC (NEW FEATURE FOR VIEWERS)
+        // ==========================================
+        const downloadPdfBtn = document.getElementById('download-pdf-btn');
+        const downloadJpegBtn = document.getElementById('download-jpeg-btn');
+        const reportContainer = document.getElementById('report-container');
+
+        // PDF Generation
+        downloadPdfBtn.addEventListener('click', () => {
+            const monthText = viewerMonthSelect.options[viewerMonthSelect.selectedIndex]?.text || "Report";
+            
+            const opt = {
+                margin:       0.4,
+                filename:     `Dining_Report_${monthText.replace(' ', '_')}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' } // Wide orientation for a perfect table layout
+            };
+            
+            window.html2pdf().set(opt).from(reportContainer).save();
+        });
+
+        // JPEG Generation
+        downloadJpegBtn.addEventListener('click', () => {
+            const monthText = viewerMonthSelect.options[viewerMonthSelect.selectedIndex]?.text || "Report";
+            
+            window.html2canvas(reportContainer, { scale: 2, useCORS: true }).then(canvas => {
+                let link = document.createElement('a');
+                link.download = `Dining_Report_${monthText.replace(' ', '_')}.jpg`;
+                link.href = canvas.toDataURL('image/jpeg', 0.95);
+                link.click();
+            });
+        });
+
+    </script>
+</body>
+</html>
